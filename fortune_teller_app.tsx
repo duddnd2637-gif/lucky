@@ -1,0 +1,242 @@
+import React, { useState } from 'react';
+import { Sparkles, Calendar, Heart, Briefcase, Wallet, Star } from 'lucide-react';
+
+export default function FortuneTeller() {
+  const [birthDate, setBirthDate] = useState('');
+  const [fortune, setFortune] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const getZodiacSign = (date) => {
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    
+    const signs = [
+      { name: '물병자리', start: [1, 20], end: [2, 18], emoji: '♒' },
+      { name: '물고기자리', start: [2, 19], end: [3, 20], emoji: '♓' },
+      { name: '양자리', start: [3, 21], end: [4, 19], emoji: '♈' },
+      { name: '황소자리', start: [4, 20], end: [5, 20], emoji: '♉' },
+      { name: '쌍둥이자리', start: [5, 21], end: [6, 21], emoji: '♊' },
+      { name: '게자리', start: [6, 22], end: [7, 22], emoji: '♋' },
+      { name: '사자자리', start: [7, 23], end: [8, 22], emoji: '♌' },
+      { name: '처녀자리', start: [8, 23], end: [9, 23], emoji: '♍' },
+      { name: '천칭자리', start: [9, 24], end: [10, 22], emoji: '♎' },
+      { name: '전갈자리', start: [10, 23], end: [11, 22], emoji: '♏' },
+      { name: '사수자리', start: [11, 23], end: [12, 21], emoji: '♐' },
+      { name: '염소자리', start: [12, 22], end: [1, 19], emoji: '♑' }
+    ];
+
+    for (let sign of signs) {
+      const [startMonth, startDay] = sign.start;
+      const [endMonth, endDay] = sign.end;
+      
+      if ((month === startMonth && day >= startDay) || (month === endMonth && day <= endDay)) {
+        return sign;
+      }
+    }
+    
+    return signs[11];
+  };
+
+  const getFortune = async () => {
+    if (!birthDate) {
+      alert('생년월일을 입력해주세요!');
+      return;
+    }
+
+    setLoading(true);
+    
+    const date = new Date(birthDate);
+    const zodiac = getZodiacSign(date);
+    const today = new Date().toLocaleDateString('ko-KR');
+    
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          messages: [{
+            role: 'user',
+            content: `당신은 따뜻하고 긍정적인 운세 전문가입니다. 
+            
+생년월일: ${birthDate}
+별자리: ${zodiac.name} ${zodiac.emoji}
+오늘 날짜: ${today}
+
+위 정보를 바탕으로 오늘의 운세를 다음 형식의 JSON으로 작성해주세요:
+
+{
+  "overall": "전체운 (50자 이내, 긍정적이고 구체적으로)",
+  "love": "애정운 (40자 이내, 따뜻하고 희망적으로)",
+  "career": "직업운 (40자 이내, 동기부여가 되도록)",
+  "money": "금전운 (40자 이내, 실용적인 조언 포함)",
+  "luckyNumber": "7",
+  "luckyColor": "보라색",
+  "advice": "오늘의 조언 (60자 이내, 실천 가능한 구체적 행동)"
+}
+
+JSON만 출력하고 다른 텍스트는 포함하지 마세요.`
+          }]
+        })
+      });
+
+      const data = await response.json();
+      const text = data.content.find(item => item.type === 'text')?.text || '';
+      const cleanText = text.replace(/```json|```/g, '').trim();
+      const fortuneData = JSON.parse(cleanText);
+      
+      setFortune({
+        ...fortuneData,
+        zodiac: zodiac.name,
+        zodiacEmoji: zodiac.emoji,
+        date: today
+      });
+    } catch (error) {
+      console.error('운세 생성 오류:', error);
+      alert('운세를 불러오는데 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-4 sm:p-8">
+      <div className="max-w-2xl mx-auto">
+        {/* 헤더 */}
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <Sparkles className="w-8 h-8 text-yellow-300 animate-pulse" />
+            <h1 className="text-4xl sm:text-5xl font-bold text-white">오늘의 운세</h1>
+            <Sparkles className="w-8 h-8 text-yellow-300 animate-pulse" />
+          </div>
+          <p className="text-purple-200 text-lg">당신만을 위한 특별한 메시지</p>
+        </div>
+
+        {/* 입력 카드 */}
+        <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-6 sm:p-8 shadow-2xl mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Calendar className="w-6 h-6 text-purple-300" />
+            <label className="text-white font-semibold text-lg">생년월일을 입력하세요</label>
+          </div>
+          
+          <input
+            type="date"
+            value={birthDate}
+            onChange={(e) => setBirthDate(e.target.value)}
+            className="w-full px-4 py-3 rounded-xl bg-white/20 text-white border-2 border-purple-300/50 focus:border-purple-400 focus:outline-none text-lg mb-4"
+            max={new Date().toISOString().split('T')[0]}
+          />
+          
+          <button
+            onClick={getFortune}
+            disabled={loading}
+            className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold py-4 rounded-xl transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg text-lg"
+          >
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <div className="w-5 h-5 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
+                운세를 보는 중...
+              </span>
+            ) : (
+              '✨ 오늘의 운세 보기 ✨'
+            )}
+          </button>
+        </div>
+
+        {/* 운세 결과 */}
+        {fortune && (
+          <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-6 sm:p-8 shadow-2xl animate-fade-in">
+            {/* 별자리 정보 */}
+            <div className="text-center mb-6 pb-6 border-b border-white/20">
+              <div className="text-6xl mb-2">{fortune.zodiacEmoji}</div>
+              <h2 className="text-2xl font-bold text-white mb-1">{fortune.zodiac}</h2>
+              <p className="text-purple-200">{fortune.date}</p>
+            </div>
+
+            {/* 전체운 */}
+            <div className="mb-6 p-4 bg-white/10 rounded-2xl">
+              <div className="flex items-center gap-2 mb-2">
+                <Star className="w-5 h-5 text-yellow-300" />
+                <h3 className="text-xl font-bold text-white">전체운</h3>
+              </div>
+              <p className="text-purple-100 text-lg leading-relaxed">{fortune.overall}</p>
+            </div>
+
+            {/* 세부 운세 */}
+            <div className="grid gap-4 mb-6">
+              <div className="bg-white/10 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Heart className="w-5 h-5 text-pink-300" />
+                  <h4 className="font-bold text-white">애정운</h4>
+                </div>
+                <p className="text-purple-100">{fortune.love}</p>
+              </div>
+
+              <div className="bg-white/10 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Briefcase className="w-5 h-5 text-blue-300" />
+                  <h4 className="font-bold text-white">직업운</h4>
+                </div>
+                <p className="text-purple-100">{fortune.career}</p>
+              </div>
+
+              <div className="bg-white/10 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Wallet className="w-5 h-5 text-green-300" />
+                  <h4 className="font-bold text-white">금전운</h4>
+                </div>
+                <p className="text-purple-100">{fortune.money}</p>
+              </div>
+            </div>
+
+            {/* 행운의 요소 */}
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="bg-gradient-to-br from-yellow-400/20 to-orange-400/20 rounded-xl p-4 text-center">
+                <div className="text-3xl mb-1">{fortune.luckyNumber}</div>
+                <div className="text-white font-semibold">행운의 숫자</div>
+              </div>
+              <div className="bg-gradient-to-br from-purple-400/20 to-pink-400/20 rounded-xl p-4 text-center">
+                <div className="text-3xl mb-1">🎨</div>
+                <div className="text-white font-semibold">{fortune.luckyColor}</div>
+                <div className="text-purple-200 text-sm">행운의 색</div>
+              </div>
+            </div>
+
+            {/* 오늘의 조언 */}
+            <div className="bg-gradient-to-r from-purple-500/30 to-pink-500/30 rounded-2xl p-5">
+              <h4 className="font-bold text-white mb-2 text-lg">💫 오늘의 조언</h4>
+              <p className="text-white leading-relaxed">{fortune.advice}</p>
+            </div>
+
+            {/* 다시보기 버튼 */}
+            <button
+              onClick={() => setFortune(null)}
+              className="w-full mt-6 bg-white/20 hover:bg-white/30 text-white font-semibold py-3 rounded-xl transition-all"
+            >
+              다른 날짜로 보기
+            </button>
+          </div>
+        )}
+      </div>
+
+      <style jsx>{`
+        @keyframes fade-in {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fade-in {
+          animation: fade-in 0.6s ease-out;
+        }
+      `}</style>
+    </div>
+  );
+}
